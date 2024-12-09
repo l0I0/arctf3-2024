@@ -1,0 +1,93 @@
+services:
+  hippopotamus-fastapi:
+    container_name: hippopotamus_fastapi
+    build:
+      context: .
+      dockerfile: docker/fastapi/Dockerfile
+    ports:
+      - "${API_PORT}:8000"
+    volumes:
+      - ./app:/hippo/app
+      - ./migrations:/hippo/migrations
+      - ./alembic.ini:/hippo/alembic.ini
+    environment:
+      - PYTHONUNBUFFERED=1
+      - POSTGRES_URL=${POSTGRES_URL}
+      - POSTGRES_URL_ASYNC=${POSTGRES_URL_ASYNC}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - TZ=Europe/Moscow
+    depends_on:
+      hippopotamus-postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  hippopotamus-postgres:
+    container_name: ${POSTGRES_HOST}
+    image: postgres:15
+    volumes:
+      - hippopotamus-postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - TZ=Europe/Moscow
+    # ports:
+    #   - "${POSTGRES_PORT}:5432"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  hippopotamus-adminer:
+    container_name: hippopotamus_adminer
+    image: adminer
+    restart: always
+    ports:
+      - "${ADMINER_PORT}:8080"
+      
+  telegram-bot:
+    container_name: hippopotamus_telegram_bot
+    build:
+      context: .
+      dockerfile: docker/telegram-bot/Dockerfile
+    volumes:
+      - ./telegram-bot:/bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - POSTGRES_URL_ASYNC=${POSTGRES_URL_ASYNC}
+      - TZ=Europe/Moscow
+    depends_on:
+      - hippopotamus-postgres
+    restart: always
+
+  hippopotamus-redis:
+    container_name: hippopotamus_redis
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
+    environment:
+      - TZ=Europe/Moscow
+
+  hippopotamus-frontend:
+    container_name: hippopotamus_frontend
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    ports:
+      - "${FRONTEND_PORT}:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL}
+      - TZ=Europe/Moscow
+    depends_on:
+      - hippopotamus-fastapi
+
+volumes:
+  hippopotamus-postgres_data:

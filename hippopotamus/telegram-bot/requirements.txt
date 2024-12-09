@@ -1,0 +1,6 @@
+aiogram
+sqlalchemy
+psycopg2-binary
+environs
+watchdog
+asyncpg

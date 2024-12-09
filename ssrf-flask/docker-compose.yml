@@ -1,0 +1,81 @@
+version: '3'
+
+services:
+  web-outside:
+    container_name: ssrf-web1-outside
+    build:
+      context: .
+      dockerfile: app1/Dockerfile
+    ports:
+      - "23694:7000"
+    volumes:
+      - ./app1:/app:ro
+    environment:
+      - FLASK_ENV=development
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 512m
+    cpu_shares: 512
+
+  web-inside:
+    container_name: ssrf-web2-inside
+    build:
+      context: .
+      dockerfile: app2/Dockerfile
+    expose:
+      - "7001"
+    volumes:
+      - ./app2:/app:ro
+    environment:
+      - FLASK_ENV=development
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 512m
+    cpu_shares: 512
+
+  web-photo:
+    container_name: ssrf-web3
+    build:
+      context: .
+      dockerfile: app3/Dockerfile
+    expose:
+      - "7002"
+    volumes:
+      - ./app3:/app:ro
+      - uploads:/app/uploads
+    environment:
+      - FLASK_ENV=development
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 512m
+    cpu_shares: 512
+
+volumes:
+  uploads:

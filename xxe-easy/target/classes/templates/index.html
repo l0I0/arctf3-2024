@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Поиск места</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
+        }
+        .form-group {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+        input[type="number"] {
+            padding: 10px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 150px;
+        }
+        .button, .check-button {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            border: none;
+            color: white;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .button:hover, .check-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            margin: 20px 0;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .snow-hint {
+            font-size: 28px;
+            margin: 30px 0;
+            color: #2c3e50;
+            text-align: center;
+            font-weight: bold;
+        }
+        .parser-response {
+            margin-top: 20px;
+            padding: 25px;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        /* Анимация снега */
+        @keyframes snowfall {
+            0% { transform: translateY(-10px) rotate(0deg); }
+            100% { transform: translateY(100vh) rotate(360deg); }
+        }
+        .snowflake {
+            position: fixed;
+            color: #fff;
+            font-size: 20px;
+            animation: snowfall linear infinite;
+            pointer-events: none;
+            z-index: 1000;
+            text-shadow: 0 0 5px rgba(255,255,255,0.8);
+        }
+
+        /* Анимация солнца */
+        @keyframes sunshine {
+            0% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.2) rotate(180deg); }
+            100% { transform: scale(1) rotate(360deg); }
+        }
+        .sun {
+            position: fixed;
+            top: 50px;
+            right: 50px;
+            font-size: 60px;
+            animation: sunshine 4s infinite linear;
+            z-index: 1000;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Поиск места</h1>
+        <div class="snow-hint">Ищи там где снег ❄️</div>
+        <div class="map-hint">Кликните по карте, чтобы выбрать координаты</div>
+        <div class="form-group">
+            <label for="latitude">Широта:</label>
+            <input type="number" id="latitude" step="0.000001">
+            <label for="longitude">Долгота:</label>
+            <input type="number" id="longitude" step="0.000001">
+        </div>
+        <div class="button-group">
+            <button onclick="checkCoordinates()" class="check-button">Проверить координаты</button>
+            <button onclick="showOnMap()" class="button">Показать на карте</button>
+        </div>
+        <div id="map"></div>
+        <div id="parser-response" class="parser-response" style="display: none;">
+            <div class="response-title"></div>
+            <pre id="response-content"></pre>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Весь JavaScript код из parser.html
+        var map = L.map('map').setView([60.0, 30.0], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var marker;
+
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            
+            document.getElementById('latitude').value = lat.toFixed(6);
+            document.getElementById('longitude').value = lng.toFixed(6);
+            
+            if (marker) {
+                map.removeLayer(marker);
+            }
+            marker = L.marker([lat, lng]).addTo(map);
+        });
+
+        function createXml(lat, lng) {
+            return `<?xml version="1.0" encoding="UTF-8"?>
+<location>
+    <latitude>${lat}</latitude>
+    <longitude>${lng}</longitude>
+</location>`;
+        }
+
+        function checkCoordinates() {
+            const lat = document.getElementById('latitude').value;
+            const lng = document.getElementById('longitude').value;
+            const xml = createXml(lat, lng);
+
+            fetch('/process-xml', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/xml'
+                },
+                body: xml
+            })
+            .then(response => response.json())
+            .then(data => {
+                const responseDiv = document.getElementById('parser-response');
+                const responseContent = document.getElementById('response-content');
+                responseDiv.style.display = 'block';
+                
+                // Добавить анимацию в зависимости от наличия снега
+                if(data.hasSnow) {
+                    createSnowAnimation();
+                } else {
+                    createSunAnimation();
+                }
+
+                responseContent.innerHTML = `
+                    <div style="font-size: 18px; margin-bottom: 10px;">
+                        <strong>Координаты:</strong> ${data.latitude}, ${data.longitude}
+                    </div>
+                    <div style="font-size: 24px; margin-bottom: 10px; text-align: center;">
+                        ${data.hasSnow ? 
+                            '<span style="color: #3498db">❄️ Холодно! В этом месте есть снег</span>' : 
+                            '<span style="color: #e74c3c">☀️ Тепло! В этом месте снега нет</span>'
+                        }
+                    </div>`;
+                
+                showOnMap();
+            })
+            .catch(error => {
+                const responseDiv = document.getElementById('parser-response');
+                const responseContent = document.getElementById('response-content');
+                responseDiv.style.display = 'block';
+                responseContent.textContent = 'Ошибка: ' + error.message;
+            });
+        }
+
+        function showOnMap() {
+            const lat = document.getElementById('latitude').value;
+            const lng = document.getElementById('longitude').value;
+            
+            if (lat && lng) {
+                if (marker) {
+                    map.removeLayer(marker);
+                }
+                marker = L.marker([lat, lng]).addTo(map);
+                map.setView([lat, lng], 13);
+            }
+        }
+
+        function createSnowAnimation() {
+            removeWeatherEffects();
+            for(let i = 0; i < 50; i++) {
+                const snowflake = document.createElement('div');
+                snowflake.className = 'snowflake';
+                snowflake.style.left = Math.random() * 100 + 'vw';
+                snowflake.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                snowflake.style.opacity = Math.random();
+                snowflake.innerHTML = '❄';
+                document.body.appendChild(snowflake);
+            }
+        }
+
+        function createSunAnimation() {
+            removeWeatherEffects();
+            const sun = document.createElement('div');
+            sun.className = 'sun';
+            sun.innerHTML = '☀️';
+            document.body.appendChild(sun);
+        }
+
+        function removeWeatherEffects() {
+            document.querySelectorAll('.snowflake, .sun').forEach(el => el.remove());
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,16 @@
+services:
+  web:
+    image: python:3.11-slim
+    container_name: flask_app
+    working_dir: /app
+    volumes:
+      - .:/app:ro
+    ports:
+      - "39648:7783"
+    environment:
+      FLASK_ENV: production
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      gunicorn --reload -w 4 -b 0.0.0.0:7783 app:app

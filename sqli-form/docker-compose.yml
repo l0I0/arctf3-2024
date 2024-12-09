@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  sqli-form-web:
+    container_name: sqli-form_sqli-form-php
+    build: .
+    ports:
+      - "13393:80"
+    volumes:
+      - ./src:/var/www/html:ro
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html
+      - MYSQL_HOST=sqli-form-mysql
+      - MYSQL_DATABASE=myapp
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      sqli-form-mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  sqli-form-mysql:
+    container_name: sqli-form_sqli-form-mysql
+    image: mysql:8.0.32
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: myapp
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - sqli-form-mysql_data:/var/lib/mysql
+      - ./src/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  sqli-form-mysql_data:
+    driver: local 

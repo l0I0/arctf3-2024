@@ -1,0 +1,6 @@
+com/example/demo/controllers/TestController.class
+com/example/demo/DemoApplication.class
+com/example/demo/model/Location.class
+com/example/demo/model/User.class
+com/example/demo/service/SnowService.class
+com/example/demo/controller/XmlController.class
